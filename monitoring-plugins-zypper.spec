@@ -26,7 +26,7 @@ Name:           monitoring-plugins-zypper
 Summary:        Check for software updates via zypper
 License:        BSD-3-Clause
 Group:          System/Monitoring
-Version:        1.98.3
+Version:        1.98.4
 Release:        0
 URL:            https://github.com/lrupp/monitoring-plugins-zypper
 Source0:        %{name}-%{version}.tar.xz
@@ -36,9 +36,7 @@ Requires:       rpm
 %if 0%{?suse_version} > 1310
 BuildRequires:  sudo
 Requires:       sudo
-Source5:        sudo-profile-check_zypper
 %endif
-%if 0%{?suse_version} > 1010
 # nagios can execute the script with embedded perl
 Recommends:     perl 
 Recommends:     apparmor-parser
@@ -47,7 +45,6 @@ BuildRequires:  apparmor-parser
 Requires:       apparmor-abstractions
 %else
 Requires:       apparmor-profiles
-%endif
 %endif
 Requires:       zypper
 BuildArch:      noarch
