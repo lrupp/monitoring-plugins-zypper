@@ -52,7 +52,7 @@ $ENV{'ENV'}      = '';
 
 # constants
 $PROGNAME = "check_zypper";
-$VERSION  = '1.98';
+$VERSION  = '1.98.3';
 $DEBUG    = 0;
 
 # variables

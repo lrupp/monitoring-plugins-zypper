@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Mon Nov 25 10:58:27 UTC 2019 - Lars Vogdt <lars@linux-schulserver.de>
+
+- update to 1.98.3
+  + no source changes
+- adjust spec file to use the OBS service generated files
+
+-------------------------------------------------------------------
 Mon Nov 25 09:32:04 UTC 2019 - Lars Vogdt <lars@linux-schulserver.de>
 
 - update to 1.98
