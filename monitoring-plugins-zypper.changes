@@ -5,6 +5,7 @@ Mon Nov 25 09:32:04 UTC 2019 - Lars Vogdt <lars@linux-schulserver.de>
   + openSUSE 15.0 is running out of service end of November 2019
   + add Tumbleweed 2020 into the game
   + adjust copyright notice in script
+- use new Github repo URL in spec file
 
 -------------------------------------------------------------------
 Tue Nov 19 18:16:23 CET 2019 - ro@suse.de

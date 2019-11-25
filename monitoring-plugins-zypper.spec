@@ -28,7 +28,7 @@ License:        BSD-3-Clause
 Group:          System/Monitoring
 Version:        1.98
 Release:        0
-URL:            http://en.opensuse.org/Monitoring-plugins-zypper
+URL:            https://github.com/lrupp/monitoring-plugins-zypper
 Source0:        check_zypper.pl
 Source1:        usr.lib.nagios.plugins.check_zypper 
 Source2:        apparmor-abstractions-zypp
