@@ -6,7 +6,7 @@
 # Copyright (C) 2008-2010, Novell, Inc.
 # Copyright (C) 2011-2014, SUSE Linux Products GmbH
 # Copyright (C) 2015-2018, SUSE Linux GmbH
-# Copyright (C) 2019-, SUSE Software Solutions Germany GmbH
+# Copyright (C) 2019-    , SUSE LCC
 # Author: Lars Vogdt
 #
 # All rights reserved.
@@ -38,11 +38,13 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 # perltidy -pbp check_zypper.pl
-# 
+#
 
 use strict;
 use warnings;
 use Getopt::Long;
+use POSIX qw(strftime);
+use Time::Local;
 use vars qw($PROGNAME $VERSION $DEBUG);
 
 # cleanup the environment
@@ -52,13 +54,13 @@ $ENV{'ENV'}      = '';
 
 # constants
 $PROGNAME = "check_zypper";
-$VERSION  = '1.98.3';
+$VERSION  = '1.98.6';
 $DEBUG    = 0;
 
 # variables
 our (
-    $opt_V, $opt_h, $opt_i, $opt_w, $opt_c, $opt_f, $opt_l,
-    $opt_o, $opt_p, $opt_r, $opt_s, $opt_t, $opt_u, $opt_v
+    $opt_V, $opt_h, $opt_i, $opt_w, $opt_c, $opt_f, $opt_l, $opt_o,
+    $opt_p, $opt_r, $opt_s, $opt_t, $opt_u, $opt_v, $opt_x, $opt_y
 );
 our $zypper           = '/usr/bin/zypper';
 our $zypperopt        = '--non-interactive --no-gpg-checks list-updates';
@@ -94,9 +96,9 @@ our %REVERSE = (
     0 => 'OK',
 );
 our %supported_release = (
-    'openSUSE'   => [ '15.1', '15.2', '15.2.1', '15.3' ],
-    'SLE'        => [ '11.4', '12.4', '12.5', '15.0', '15.1', '15.2', '15.3' ],
-    'Tumbleweed' => [ '2020*' ],
+    'openSUSE' => [ '15.1', '15.2', '15.2.1', '15.3' ],
+    'SLE' => [ '11.4', '12.4', '12.5', '15.0', '15.1', '15.2', '15.3' ],
+    'Tumbleweed' => ['2020*'],
 );
 $opt_w = 'recommended,optional,unsupported,local_package';
 $opt_c = 'security';
@@ -107,6 +109,8 @@ $opt_v = 0;
 $opt_o = 0;
 $opt_p = 1;
 $opt_s = 0;
+$opt_x = 30;
+$opt_y = 60;
 
 #######################################################################
 # Functions
@@ -132,48 +136,6 @@ sub usage ($) {
     exit $ERRORS{'UNKNOWN'};
 }
 
-sub get_distribution_from_os_release($) {
-    my ($file) = @_;
-    my %dist = (
-        'name'    => '',
-        'version' => '',
-        'release' => '0',
-    );
-    open( RELEASE, "<$file" ) || warn("Could not open $file\n");
-    while (<RELEASE>) {
-        if (/^PRETTY_NAME=\"SUSE Linux Enterprise.*/) {
-            $dist{'name'} = 'SLE';
-        }
-        elsif (/^PRETTY_NAME=\".*Tumbleweed.*/) {
-            $dist{'name'} = 'Tumbleweed';
-        }
-        elsif (/^PRETTY_NAME=\"openSUSE.*/) {
-            $dist{'name'} = 'openSUSE';
-        }
-    }
-    close(RELEASE);
-    open( RELEASE, "<$file" ) || warn("Could not open $file\n");
-    while (<RELEASE>) {
-        if (/^VERSION_ID/) {
-            my ($version) = $_ =~ m/VERSION_ID=\"(.*)\"/;
-            if (( $dist{'name'} eq 'SLE' ) || ( $dist{'name'} eq '' )) {
-                if ( $version =~ m/(\d+)\.(\d+).*/ ) {
-                    $dist{'version'} = trim($1);
-                    $dist{'release'} = trim($2);
-                }
-		else {
-		    $dist{'version'} = trim($version);
-		}
-            }
-            else {
-                $dist{'version'} = trim($version);
-            }
-        }
-    }
-    close(RELEASE);
-    return ( \%dist );
-}
-
 sub get_distribution($) {
     my ($file) = @_;
     my %dist = (
@@ -181,23 +143,37 @@ sub get_distribution($) {
         'version' => '',
         'release' => '0',
     );
-    open( RELEASE, "<$file" ) || warn("Could not open $file\n");
+    open( RELEASE, "<$file" ) || die("Could not open $file\n");
     while (<RELEASE>) {
-        if (/^SUSE Linux Enterprise/) {
+        if (/^PRETTY_NAME=\"SUSE Linux Enterprise.*/) {
             $dist{'name'} = 'SLE';
         }
-        elsif (/^openSUSE/) {
-            $dist{'name'} = 'openSUSE';
+        elsif (/^PRETTY_NAME=\"openSUSE.*/) {
+            if (/^PRETTY_NAME=\".*Tumbleweed.*/) {
+                $dist{'name'} = 'Tumbleweed';
+            }
+            else {
+                $dist{'name'} = 'openSUSE';
+            }
         }
-        elsif (/^CODENAME\s+=\s+Tumbleweed/) {
-            $dist{'name'} = 'Tumbleweed';
+        if (/^VERSION_ID/) {
+            my ($version) = $_ =~ m/VERSION_ID=\"(.*)\"/;
+            if ( ( $dist{'name'} eq 'SLE' ) || ( $dist{'name'} eq '' ) ) {
+                if ( $version =~ m/(\d+)\.(\d+).*/ ) {
+                    $dist{'version'} = trim($1);
+                    $dist{'release'} = trim($2);
+                }
+                else {
+                    $dist{'version'} = trim($version);
+                }
+            }
         }
-        if (/^VERSION/) {
-            my ($version) = $_ =~ m/VERSION = (.*)/;
+        if (/^VERSION=/) {
+            my ($version) = $_ =~ m/VERSION.*=(.*)/;
             $dist{'version'} = trim($version);
         }
-        if (/^PATCHLEVEL/) {
-            my ($release) = $_ =~ m/PATCHLEVEL = (.*)/;
+        if (/^PATCHLEVEL=/) {
+            my ($release) = $_ =~ m/PATCHLEVEL.*= (.*)/;
             $dist{'release'} = trim($release);
         }
     }
@@ -226,13 +202,14 @@ sub endoflife($) {
 sub print_usage () {
     print "This plugin checks for software updates on systems that \n";
     print "use package management systems based on the zypper command \n";
-	print "found in (open)SUSE.\n\n";
+    print "found in (open)SUSE.\n\n";
     print "It checks for security, recommended and optional patches \n";
     print "and also for optional package updates.\n\n";
     print "You can define the status by patch category. Use a commata to\n";
     print "list more than one category to a state. Possible values are: \n";
     print "   recommended,optional,security and packages\n\n";
-    print "If you like to know the names of available patches and packages, \n";
+    print
+        "If you like to know the names of available patches and packages, \n";
     print "use the \"-v\" option.\n\n";
     print "Usage:\n";
     print "  $PROGNAME [-w <category>] [-c <category>] [-t <timeout>] [-v]\n";
@@ -243,14 +220,17 @@ sub print_usage () {
     print "      A patch with this category result in critical status.\n";
     print "      Default: $opt_c\n";
     print "  -f, --releasefile\n";
-    print "      Use the given file to get informations about the distribution.\n";
+    print
+        "      Use the given file to get informations about the distribution.\n";
     print "      Default: $alt_releasefile (fallback: $releasefile)\n";
     print "  -h, --help\n";
     print "      Print detailed help screen\n";
     print "  -i, --ignore <file>\n";
     print "      Ignore patches/packages that are mentioned in <file>\n";
-    print "      Place the file in /etc/nagios/ or /etc/monitoring-plugins/ \n";
-    print "      and/or adapt the apparmor profile before using this feature!\n";
+    print
+        "      Place the file in /etc/nagios/ or /etc/monitoring-plugins/ \n";
+    print
+        "      and/or adapt the apparmor profile before using this feature!\n";
     print "      Just list one patch/package per line - example:\n\n";
     print "      patch:libtiff-devel\n";
     print "      # comment\n";
@@ -265,7 +245,8 @@ sub print_usage () {
     print "  -p, --no_perfdata\n";
     print "      Print no perfdata\n";
     print "  -r, --refresh_repos\n";
-    print "      Tries to refresh the repositories before checking for updates.\n";
+    print
+        "      Tries to refresh the repositories before checking for updates.\n";
     print "      Note: this maybe needs an entry in /etc/sudoers like:\n";
     print "            nagios ALL = NOPASSWD: /usr/bin/zypper ref\n";
     print "            (and additional lines for the \'-s\' Option) if no \n";
@@ -280,10 +261,12 @@ sub print_usage () {
     print "          nagios ALL = NOPASSWD: /usr/bin/zypper services, \\ \n";
     print "                       /usr/bin/zypper $zypperopt\n";
     print "  -t, --timeout\n";
-    print "      Just in case of problems, let's not hang Nagios and define a timeout.\n";
+    print
+        "      Just in case of problems, let's not hang Nagios and define a timeout.\n";
     print "      Default value is: $opt_t seconds\n";
     print "  -u, --check-vendor\n";
-    print "      Check if installed packages are not from a supported vendor.\n";
+    print
+        "      Check if installed packages are not from a supported vendor.\n";
     print "  -l, --check-local\n";
     print "      Check for local packages that are not in any \n";
     print "      repository. NOTE: zypper just searches for\n";
@@ -304,17 +287,26 @@ sub print_usage () {
     print "  -d, --debug\n";
     print "      Print debug output to STDERR\n";
     print "\n";
+    print "  --tw_outdated_warn\n";
+    print "    Days before a Tumbleweed installation is seen as outdated.\n";
+    print "    Result will be a warning state (default: $opt_x days)\n";
+    print "\n";
+    print "  --tw_outdated_crit\n";
+    print "    Days before a Tumbleweed installation is seen as outdated.\n";
+    print "    Result will be a critical state (default: $opt_y days)\n";
+    print "\n";
     print " The lines below contain all entries for your sudoers ";
     print " file, if needed:\n";
     print "    nagios ALL = NOPASSWD: /usr/sbin/zypp-refresh \"\",\\ \n";
-	print "                           /usr/bin/zypper refresh,\\ \n";
-	print "                           /usr/bin/zypper services,\\ \n";
+    print "                           /usr/bin/zypper refresh,\\ \n";
+    print "                           /usr/bin/zypper services,\\ \n";
     print "                           /usr/bin/zypper $zypperopt\n";
 }
 
 sub print_help {
     my $exit = shift || undef;
     print "Copyright (c) 2009-2018, SUSE Linux GmbH\n\n";
+    print "Copyright (c) 2019-    , SUSE LCC\n\n";
     print_usage();
     print "\n";
     mysupport();
@@ -323,13 +315,54 @@ sub print_help {
 
 sub check_zypper() {
     if ( -x "$zypper" ) {
-        print STDERR "INFO: Trying $use_sudo $zypper services 2>/dev/null 1>&2\n"
+        print STDERR
+            "INFO: Trying $use_sudo $zypper services 2>/dev/null 1>&2\n"
             if ($DEBUG);
         return ( system("$use_sudo $zypper services 2>/dev/null 1>&2") );
     }
     else {
         return 1;
     }
+}
+
+sub test_tumbleweed($) {
+    my ($version)  = @_;
+    my $string     = 'UNKOWN from test_tumbleweed';
+    my $error_code = $ERRORS{'UNKNOWN'};
+    $version += 0;
+    my $date_string = strftime "%Y%m%d", localtime( time() );
+    my $today_epoch = time();
+    my ( $version_year, $version_month, $version_day )
+        = $version =~ /\b(\d{4})(\d{2})(\d{2})\b/;
+    my $version_epoch = timelocal( 0, 0, 0, $version_day, $version_month - 1,
+        $version_year );
+    my $warnsec = $opt_x * 86400;
+    my $critsec = $opt_y * 86400;
+    my $diff    = $today_epoch - $warnsec;
+
+    if ( $version_epoch lt $diff ) {
+        $string
+            = "installed Tumbleweed version ($version) is older than $opt_x days ($diff lt $version_epoch); ";
+        $error_code = 'WARNING';
+        $diff       = $today_epoch - $critsec;
+        if ( $version_epoch lt $diff ) {
+            $string
+                = "installed Tumbleweed version ($version) is older than $opt_y days ($diff lt $version_epoch); ";
+            $error_code = 'CRITICAL';
+        }
+    }
+    else {
+        $string     = '';
+        $error_code = 'OK';
+    }
+    if ($DEBUG) {
+        print STDERR
+            "INFO: Current day:        $date_string ($today_epoch)\n";
+        print STDERR "INFO: Tumbleweed version: $version ($version_epoch)\n";
+        print STDERR
+            "INFO: levels: $opt_x ($warnsec); crit: $opt_y ($critsec)\n";
+    }
+    return ( "$string", "$error_code" );
 }
 
 sub refresh_zypper($) {
@@ -343,6 +376,7 @@ sub refresh_zypper($) {
             foreach my $line (@wrapper_out) {
                 chomp $line;
                 print STDERR "LINE: $line\n" if ($DEBUG);
+
                 # error handling
                 return ( "ERROR: " . xml_re_escape($line),
                     $ERRORS{'CRITICAL'} )
@@ -437,6 +471,16 @@ sub refresh_zypper($) {
     }
 }
 
+sub check_returncode($) {
+    my $status      = shift;
+    my $level       = 0;
+    my $returnvalue = 'OK';
+    $level       = $ERRORS{$status};
+    $exitcode    = $level if ( $level gt $exitcode );
+    $returnvalue = $REVERSE{"$exitcode"};
+    return "$returnvalue";
+}
+
 sub check_errorcode($) {
     my $status      = shift;
     my $level       = 0;
@@ -444,7 +488,7 @@ sub check_errorcode($) {
     $returnvalue = 'WARNING'  if ( "$opt_w" =~ /$status/ );
     $returnvalue = 'CRITICAL' if ( "$opt_c" =~ /$status/ );
     $level       = $ERRORS{"$returnvalue"};
-    $exitcode    = $level     if ( $level gt $exitcode );
+    $exitcode    = $level if ( $level gt $exitcode );
     $returnvalue = $REVERSE{"$exitcode"};
     return "$returnvalue";
 }
@@ -463,6 +507,8 @@ sub trim($) {
     my ($text) = @_;
     $text =~ s/^\s+//;
     $text =~ s/\s+$//;
+    $text =~ s/^\"//;
+    $text =~ s/\"$//;
     return $text;
 }
 
@@ -504,9 +550,11 @@ sub check($) {
     }
 
     if ( ($opt_l) && ( $dist->{'version'} gt 10.4 ) ) {
-        print STDERR "INFO: checking for local packages not referenced in repositories\n"
+        print STDERR
+            "INFO: checking for local packages not referenced in repositories\n"
             if ($DEBUG);
-        @loc_packagelist = `$zypper search --details --installed-only | $grep '(System Packages)' | $awk '" " { print \$3 }'`;
+        @loc_packagelist
+            = `$zypper search --details --installed-only | $grep '(System Packages)' | $awk '" " { print \$3 }'`;
         my $category = 'local_package';
         my $status   = 'new';
         foreach my $name ( sort(@loc_packagelist) ) {
@@ -530,6 +578,7 @@ sub check($) {
             chomp;
             my $category = 'unknown';
             print STDERR "LINE: $_\n" if ($DEBUG);
+
             # error handling
             return (
                 'There is a pending update of the update-stack itself. This plugin can not check if there are more updates pending.',
@@ -556,7 +605,8 @@ sub check($) {
                     if ($DEBUG);
                 if ( !$opt_o ) {
                     $error = check_errorcode('security');
-                    $warnstr = "At least one of your Repositories might be out of date. Please run \"zypper refresh\" as root to update it. ";
+                    $warnstr
+                        = "At least one of your Repositories might be out of date. Please run \"zypper refresh\" as root to update it. ";
                     $warnstr .= "\n" if ($opt_v);
                     next;
                 }
@@ -579,7 +629,8 @@ sub check($) {
                     ; # just for reference - perhaps we need the variables later
                 if ( defined($name) ) {
                     if ( grep { $_ eq $name } @patchignore ) {
-                        print STDERR "WARNING: ignoring $name as it is in \@patchignore\n"
+                        print STDERR
+                            "WARNING: ignoring $name as it is in \@patchignore\n"
                             if ($DEBUG);
                         next;
                     }
@@ -601,34 +652,40 @@ sub check($) {
                     my ($edition) = $_ =~ /edition="(.*?)"/;
                     if (/kind="patch"/) {    # line contains patch
                         if ( grep { $_ eq $name } @patchignore ) {
-                            print STDERR "WARNING: ignoring $name as it is in \@patchignore\n"
+                            print STDERR
+                                "WARNING: ignoring $name as it is in \@patchignore\n"
                                 if ($DEBUG);
                             next;
                         }
                         if ( grep { $_ eq "$name-$edition" } @patchignore ) {
-                            print STDERR "WARNING: ignoring $name-$edition as it is in \@patchignore\n"
+                            print STDERR
+                                "WARNING: ignoring $name-$edition as it is in \@patchignore\n"
                                 if ($DEBUG);
                             next;
                         }
                         $category = 'optional' if (/category="optional"/);
-                        $category = 'recommended' if (/category="recommended"/);
+                        $category = 'recommended'
+                            if (/category="recommended"/);
                         $category = 'security' if (/category="security"/);
                     }
                     elsif (/kind="package"/) {
                         if ( grep { $_ eq $name } @packageignore ) {
-                            print STDERR "WARNING: ignoring $name as it is in \@packageignore\n"
+                            print STDERR
+                                "WARNING: ignoring $name as it is in \@packageignore\n"
                                 if ($DEBUG);
                             next;
                         }
                         if ( grep { $_ eq "$name-$edition" } @packageignore )
                         {
-                            print STDERR "WARNING: ignoring $name-$edition as it is in \@packageignore\n"
+                            print STDERR
+                                "WARNING: ignoring $name-$edition as it is in \@packageignore\n"
                                 if ($DEBUG);
                             next;
                         }
                         $category = 'package';
                     }
-                    $packagelist{"$category"}{"$name"}{'category'} = "$category";
+                    $packagelist{"$category"}{"$name"}{'category'}
+                        = "$category";
                     $packagelist{"$category"}{"$name"}{'name'}   = "$name";
                     $packagelist{"$category"}{"$name"}{'status'} = "Needed";
                 }
@@ -703,7 +760,10 @@ sub check($) {
 
         }
         if ($update_avail) {
-            $ret_str .= trim("$warnstr $secstr $recstr $optstr $pacstr $unsupstr $local_pacstr")." ";
+            $ret_str
+                .= trim(
+                "$warnstr $secstr $recstr $optstr $pacstr $unsupstr $local_pacstr"
+                ) . " ";
             my @packagelist             = ();
             my @unsupported_packagelist = ();
             @loc_packagelist = ();
@@ -836,36 +896,38 @@ sub check($) {
 
 Getopt::Long::Configure('bundling');
 GetOptions(
-    "V"               => \$opt_V,
-    "version"         => \$opt_V,
-    "h"               => \$opt_h,
-    "help"            => \$opt_h,
-    "d"               => \$DEBUG,
-    "debug"           => \$DEBUG,
-    "i=s"             => \$opt_i,
-    "ignore=s"        => \$opt_i,
-    "w=s"             => \$opt_w,
-    "warning=s"       => \$opt_w,
-    "c=s"             => \$opt_c,
-    "critical=s"      => \$opt_c,
-    "f=s"             => \$opt_f,
-    "releasefile=s"   => \$opt_f,
-    "o"               => \$opt_o,
-    "ignore_outdated" => \$opt_o,
-    "p:0"             => \$opt_p,
-    "no_perfdata:0"   => \$opt_p,
-    "r"               => \$opt_r,
-    "refresh_repos"   => \$opt_r,
-    "t=i"             => \$opt_t,
-    "timeout=i"       => \$opt_t,
-    "l"               => \$opt_l,
-    "check-local"     => \$opt_l,
-    "u"               => \$opt_u,
-    "check-vendor"    => \$opt_u,
-    "v"               => \$opt_v,
-    "verbose_output"  => \$opt_v,
-    "s"               => \$opt_s,
-    "use_sudo"        => \$opt_s,
+    "V"                  => \$opt_V,
+    "version"            => \$opt_V,
+    "h"                  => \$opt_h,
+    "help"               => \$opt_h,
+    "d"                  => \$DEBUG,
+    "debug"              => \$DEBUG,
+    "i=s"                => \$opt_i,
+    "ignore=s"           => \$opt_i,
+    "w=s"                => \$opt_w,
+    "warning=s"          => \$opt_w,
+    "c=s"                => \$opt_c,
+    "critical=s"         => \$opt_c,
+    "f=s"                => \$opt_f,
+    "releasefile=s"      => \$opt_f,
+    "o"                  => \$opt_o,
+    "ignore_outdated"    => \$opt_o,
+    "p:0"                => \$opt_p,
+    "no_perfdata:0"      => \$opt_p,
+    "r"                  => \$opt_r,
+    "refresh_repos"      => \$opt_r,
+    "t=i"                => \$opt_t,
+    "timeout=i"          => \$opt_t,
+    "l"                  => \$opt_l,
+    "check-local"        => \$opt_l,
+    "u"                  => \$opt_u,
+    "check-vendor"       => \$opt_u,
+    "v"                  => \$opt_v,
+    "verbose_output"     => \$opt_v,
+    "s"                  => \$opt_s,
+    "use_sudo"           => \$opt_s,
+    "tw_outdated_warn=s" => \$opt_x,
+    "tw_outdated_crit=s" => \$opt_y,
 ) or print_help(2);
 
 $TIMEOUT = $opt_t if ($opt_t);
@@ -882,14 +944,7 @@ if ($opt_V) {
     exit $ERRORS{'OK'};
 }
 
-my $dist;
-
-if ( "$opt_f" eq "$alt_releasefile" ) {
-    $dist = get_distribution_from_os_release("$opt_f");
-}
-else {
-    $dist = get_distribution("$opt_f");
-}
+my $dist = get_distribution("$opt_f");
 
 if ($DEBUG) {
     use English;
@@ -900,19 +955,19 @@ if ($DEBUG) {
         print STDERR "INFO: groupid: " . getgrgid("$gid") . "\n";
     }
     print STDERR "INFO: got distname: $dist->{'name'}, distversion: ";
-	print STDERR "$dist->{'version'}, distrelease: $dist->{'release'}";
+    print STDERR "$dist->{'version'}, distrelease: $dist->{'release'}";
     print STDERR " from $opt_f\n";
     print STDERR "INFO: " . Data::Dumper->Dump( [ \%supported_release ] );
 }
 
-my $version_release = $dist->{'version'};
-
 $zypperopt = '--non-interactive --no-gpg-checks list-updates'
     if ( "$dist->{'version'}" eq "10.2" );
-$zypperopt = '--xmlout --non-interactive list-updates --type package --type patch'
+$zypperopt
+    = '--xmlout --non-interactive list-updates --type package --type patch'
     if ( $dist->{'version'} gt 11.0 );
 
-if ( "$dist->{'name'}" eq "SLE" ) {
+my $version_release = $dist->{'version'};
+if ( defined( $dist->{'release'} ) && $dist->{'release'} ne '' ) {
     $version_release = "$dist->{'version'}.$dist->{'release'}";
     if ( ( "$dist->{'version'}" eq "10" ) && ( $dist->{'release'} gt 0 ) ) {
         $zypperopt = '--non-interactive --no-gpg-checks --terse list-updates';
@@ -933,7 +988,7 @@ if ($opt_h) {
 if ($opt_i) {
     if ( !-r "$opt_i" ) {
         print "Updates CRITICAL - can't find file '$opt_i' - perhaps ";
-		print "you should not use option '-i'?\n";
+        print "you should not use option '-i'?\n";
         exit $ERRORS{'CRITICAL'};
     }
     else {
@@ -990,13 +1045,9 @@ if ( check_zypper() ) {
 else {
     my ( $ret_str, $error ) = check($dist);
     if ( $dist->{'name'} eq "Tumbleweed" ) {
-        print STDERR "INFO: found Tumbleweed $version_release in ";
-		print STDERR "\%supported_release\n";
-        print STDERR "INFO: without parsing ";
-		print STDERR "http://download.opensuse.org/tumbleweed/repo/oss/media.1/media ";
-		print STDERR "I can not say more\n";
-        print STDERR "INFO: at the moment. So a FIXME for the script - ";
-		print STDERR "but until then, I don't be evil and say OK.\n";
+        my ( $ret_str2, $error2 ) = test_tumbleweed($version_release);
+        $ret_str = "${ret_str2}${ret_str}";
+        $error   = check_returncode($error2);
     }
     elsif ( grep {/\Q$dist->{'name'}\E/} keys %supported_release ) {
         print STDERR "INFO: found $dist->{'name'} - checking supportstatus\n"
