@@ -97,6 +97,15 @@ If you like to know the names of available patches and packages, use the "-v" op
 
   -d, --debug
       Print debug output to STDERR
+
+  --tw_outdated_warn <days>
+    Days before a Tumbleweed installation is seen as warning outdated.
+    (default: 30 days)
+
+  --tw_outdated_crit <days>
+    Days before a Tumbleweed installation is seen as critical outdated.
+    (default: 60 days)
+
 ```
 
  The lines below contain all entries for your sudoers  file, if needed:
