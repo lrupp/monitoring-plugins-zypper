@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Tue Mar 28 10:22:13 UTC 2023 - Lars Vogdt <lars@linux-schulserver.de>
+
+- update to 1.98.9
+  + remove openSUSE Leap 15.2
+  + remove SLE-15-SP2
+  + remove Tumbleweed < 2023
+
+-------------------------------------------------------------------
 Mon Mar 20 19:11:07 UTC 2023 - Lars Vogdt <lars@linux-schulserver.de>
 
 - update to 1.98.8
