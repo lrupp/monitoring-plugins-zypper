@@ -55,7 +55,7 @@ Fri Jul  3 08:16:21 UTC 2020 - Ismail Dönmez <idonmez@suse.com>
   * Adjust support status of SLE, Leap and Tumbleweed releases
 
 -------------------------------------------------------------------
-Fri Feb 24 09:07:56 UTC 2023 - Lars Vogdt <lars@linux-schulserver.de>
+Fri Feb 24 09:07:56 UTC 2020 - Lars Vogdt <lars@linux-schulserver.de>
 
 - update to 1.98.4
   + allow rpm to read files below /etc/popt.d/
