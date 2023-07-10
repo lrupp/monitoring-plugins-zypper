@@ -54,7 +54,7 @@ $ENV{'ENV'}      = '';
 
 # constants
 $PROGNAME = "check_zypper";
-$VERSION  = '1.98.9';
+$VERSION  = '1.98.10';
 $DEBUG    = 0;
 
 # variables
@@ -96,9 +96,9 @@ our %REVERSE = (
     0 => 'OK',
 );
 our %supported_release = (
-    'openSUSE' => [ '15.3', '15.4', '15.5' ],
-    'SLE' => [ '11.4', '12.5', '15.3', '15.4', '15.5' ],
-    'Tumbleweed' => [ '2023*' ],
+    'openSUSE' => [ '15.4', '15.5', '15.6', '16.0' ],
+    'SLE' => [ '11.4', '12.5', '15.3', '15.4', '15.5', '15.6', '16.0' ],
+    'Tumbleweed' => [ '2023*', '2024*' ],
 );
 $opt_w = 'recommended,optional,unsupported,local_package';
 $opt_c = 'security';
