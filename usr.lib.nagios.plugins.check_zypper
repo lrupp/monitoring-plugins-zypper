@@ -1,4 +1,3 @@
-# Last Modified: Wed Jun 23 14:48:41 2014
 #include <tunables/global>
 
 /usr/lib/nagios/plugins/check_zypper {
@@ -102,12 +101,34 @@
     #include <local/usr.lib.nagios.plugins.check_zypper.zypp_refresh>
     capability ipc_lock,
     /usr/bin/gpg2 rmix,
+    /usr/bin/gpg-agent mrix,
+    /usr/bin/gpgconf mr,
+    /usr/bin/gpgsm mr,
+    /usr/bin/scdaemon px -> /usr/lib/nagios/plugins/check_zypper//scdaemon,
+
+    # maybe abstractions/crypto? (available since AppArmor 3.0)
+    owner /etc/gcrypt/hwf.deny r,
     /proc/sys/crypto/fips_enabled r,
+
+    owner /proc/@{pid}/fd/ r,
     /var/tmp/TmpFile.*  rwk,
     /var/tmp/TmpDir.*/* rwlk,
     /var/tmp/zypp.*/*   rwlk,
     /var/tmp/zypp.*/*/* rwlk,
+    /var/tmp/zypp.*/zypp-trusted-kr*/ r,
+    /var/tmp/zypp.*/zypp-trusted-kr*/private-keys-v1.d/ w,
     /var/cache/zypp/** r,
+  }
+  profile scdaemon {
+    #include <abstractions/base>
+
+    # maybe abstractions/crypto? (available since AppArmor 3.0)
+    /etc/gcrypt/hwf.deny r,
+    /proc/sys/crypto/fips_enabled r,
+
+    owner /proc/@{pid}/task/*/comm rw,
+    /usr/bin/scdaemon r,
+    owner /var/tmp/zypp.*/zypp-trusted-kr*/S.scdaemon w,
   }
   profile zypper {
     #include <abstractions/base>
@@ -122,11 +143,17 @@
     /{,usr/}bin/bash rix,
     /usr/bin/rpmdb2solv         rix,
     /usr/bin/zypper rmix,
+    /usr/lib/sysimage/rpm/Index.db rwlk,
     /usr/share/zypper/ r,
     /usr/share/zypper/** r,
     /usr/bin/gpg2 px -> /usr/lib/nagios/plugins/check_zypper//gpg,
+    /usr/bin/gpgconf px -> /usr/lib/nagios/plugins/check_zypper//gpg,
+    /usr/bin/gpgsm px -> /usr/lib/nagios/plugins/check_zypper//gpg,
     /usr/bin/uuidgen px -> /usr/lib/nagios/plugins/check_zypper//uuidgen,
     /usr/lib*/libproxy-*/modules/config_gnome3.so mr,
+    /run/zypp-rpm.pid rwk,
+    /run/zypp.pid rwk,
+    /var/log/zypp/history r,
     /var/log/zypper.log w,
     /proc/sys/kernel/random/uuid r,
   }
