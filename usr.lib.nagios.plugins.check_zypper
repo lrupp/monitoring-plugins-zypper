@@ -1,6 +1,6 @@
 #include <tunables/global>
 
-/usr/lib/nagios/plugins/check_zypper {
+profile nagios_check_zypper /usr/lib/nagios/plugins/check_zypper {
   #include <abstractions/base>
   #include <abstractions/perl>
   #include <abstractions/consoles>
@@ -13,17 +13,17 @@
   /{,usr/}bin/grep  rix,
   /{,usr/}bin/awk   rix,
   /{,usr/}bin/gawk  rix,
-  /{,usr/}bin/rpm px -> /usr/lib/nagios/plugins/check_zypper//rpm,
+  /{,usr/}bin/rpm px -> nagios_check_zypper//rpm,
   /{,usr/}bin/bash rix,
   /{,usr/}bin/sudo Ux,
 
-  # as we do not know how people name the ignore file, we 
+  # as we do not know how people name the ignore file, we
   # allow read access to everything below /etc/nagios and /etc/monitoring-plugins/ here
   /etc/nagios/** r,
   /etc/monitoring-plugins/** r,
 
-  /usr/sbin/zypp-refresh-wrapper px -> /usr/lib/nagios/plugins/check_zypper//zypp-refresh-wrapper,
-  /usr/bin/zypper px -> /usr/lib/nagios/plugins/check_zypper//zypper,
+  /usr/sbin/zypp-refresh-wrapper px -> nagios_check_zypper//zypp-refresh-wrapper,
+  /usr/bin/zypper px -> nagios_check_zypper//zypper,
 
   profile zypp-refresh-wrapper {
     #include <abstractions/base>
@@ -34,7 +34,7 @@
     capability setuid,
     capability setgid,
     /usr/sbin/zypp-refresh-wrapper rmix,
-    /usr/sbin/zypp-refresh px -> /usr/lib/nagios/plugins/check_zypper//zypp-refresh,
+    /usr/sbin/zypp-refresh px -> nagios_check_zypper//zypp-refresh,
   }
   profile zypp-refresh {
     #include <abstractions/base>
@@ -52,10 +52,10 @@
     /{usr/,}bin/cp rix,
     /{usr/,}bin/bash rix,
     /usr/bin/rpmdb2solv         rix,
-    /usr/bin/zypper px -> /usr/lib/nagios/plugins/check_zypper//zypper,
-    /usr/bin/gpg2 px -> /usr/lib/nagios/plugins/check_zypper//gpg,
-    /usr/bin/uuidgen px -> /usr/lib/nagios/plugins/check_zypper//uuidgen,
-    /usr/bin/repo2solv.sh px -> /usr/lib/nagios/plugins/check_zypper//repo2solv, 
+    /usr/bin/zypper px -> nagios_check_zypper//zypper,
+    /usr/bin/gpg2 px -> nagios_check_zypper//gpg,
+    /usr/bin/uuidgen px -> nagios_check_zypper//uuidgen,
+    /usr/bin/repo2solv.sh px -> nagios_check_zypper//repo2solv,
     /var/lib/YaST2/cookies r,
   }
   profile repo2solv {
@@ -104,7 +104,7 @@
     /usr/bin/gpg-agent mrix,
     /usr/bin/gpgconf mr,
     /usr/bin/gpgsm mr,
-    /usr/bin/scdaemon px -> /usr/lib/nagios/plugins/check_zypper//scdaemon,
+    /usr/bin/scdaemon px -> nagios_check_zypper//scdaemon,
 
     # maybe abstractions/crypto? (available since AppArmor 3.0)
     owner /etc/gcrypt/hwf.deny r,
@@ -146,10 +146,10 @@
     /usr/lib/sysimage/rpm/Index.db rwlk,
     /usr/share/zypper/ r,
     /usr/share/zypper/** r,
-    /usr/bin/gpg2 px -> /usr/lib/nagios/plugins/check_zypper//gpg,
-    /usr/bin/gpgconf px -> /usr/lib/nagios/plugins/check_zypper//gpg,
-    /usr/bin/gpgsm px -> /usr/lib/nagios/plugins/check_zypper//gpg,
-    /usr/bin/uuidgen px -> /usr/lib/nagios/plugins/check_zypper//uuidgen,
+    /usr/bin/gpg2 px -> nagios_check_zypper//gpg,
+    /usr/bin/gpgconf px -> nagios_check_zypper//gpg,
+    /usr/bin/gpgsm px -> nagios_check_zypper//gpg,
+    /usr/bin/uuidgen px -> nagios_check_zypper//uuidgen,
     /usr/lib*/libproxy-*/modules/config_gnome3.so mr,
     /run/zypp-rpm.pid rwk,
     /run/zypp.pid rwk,
